@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3D Solar System with Asteroids</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+    }
+    canvas {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+
+  <script>
+    let scene, camera, renderer;
+
+    function init() {
+      // Create the scene
+      scene = new THREE.Scene();
+
+      // Create the camera
+      camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 10000);
+      camera.position.z = 1500;  // Move the camera further back to fit the entire solar system
+
+      // Create the renderer
+      renderer = new THREE.WebGLRenderer();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      document.body.appendChild(renderer.domElement);
+
+      // Add lighting
+      const light = new THREE.PointLight(0xffffff, 1);
+      light.position.set(0, 0, 2000);
+      scene.add(light);
+
+      // Scaled up planet data with sun
+      const planetData = [
+        { name: 'Sun', radius: 140, color: 0xffff00, position: -1000 },  // Sun added before Mercury
+        { name: 'Mercury', radius: 20, color: 0xa9a9a9, position: -600 },
+        { name: 'Venus', radius: 40, color: 0xffc300, position: -400 },
+        { name: 'Earth', radius: 50, color: 0x0077be, position: -200 },
+        { name: 'Mars', radius: 30, color: 0xff5733, position: 0 },
+        { name: 'Jupiter', radius: 100, color: 0xff5733, position: 300 },
+        { name: 'Saturn', radius: 90, color: 0xf5deb3, position: 600 },
+        { name: 'Uranus', radius: 70, color: 0x00ced1, position: 900 },
+        { name: 'Neptune', radius: 60, color: 0x4682b4, position: 1200 }
+      ];
+
+      // Create the sun and planets
+      planetData.forEach(planet => {
+        const geometry = new THREE.SphereGeometry(planet.radius, 32, 32);
+        const material = new THREE.MeshBasicMaterial({ color: planet.color });
+        const sphere = new THREE.Mesh(geometry, material);
+        sphere.position.set(planet.position, 0, 0);
+        scene.add(sphere);
+      });
+
+      // Fetch asteroid data and create asteroids
+      fetchAsteroids(planetData);
+
+      // Render the scene
+      animate();
+    }
+
+    function fetchAsteroids(planetData) {
+      axios.get('https://api.nasa.gov/neo/rest/v1/neo/browse?api_key=TkvvWBL0P52VTJi08x24fzbZHNbhcUl3TgGA2eeL') // Replace with your API key
+        .then(response => {
+          const asteroids = response.data.near_earth_objects.slice(0, 300);  // Get up to 300 asteroids
+          createAsteroids(planetData, asteroids);
+        })
+        .catch(error => {
+          console.error('Error fetching asteroids:', error);
+        });
+    }
+
+    function createAsteroids(planetData, asteroids) {
+    const asteroidOffset = 600;  // Increased offset for better spacing
+
+    // Get the index of Earth in the planetData array
+    const earthIndex = planetData.findIndex(planet => planet.name === 'Earth');
+
+    asteroids.forEach((asteroid, i) => {
+        const asteroidSize = Math.random() * 10 + 5;  // Asteroid sizes between 5 and 15 (scaled down)
+        const asteroidGeometry = new THREE.SphereGeometry(asteroidSize, 32, 32);
+        const asteroidMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
+        const asteroidMesh = new THREE.Mesh(asteroidGeometry, asteroidMaterial);
+
+        // Positioning asteroids only around planets after Earth
+        const planetIndex = (i % (planetData.length - earthIndex - 1)) + earthIndex + 1;  // Start placing asteroids after Earth
+        const planet = planetData[planetIndex];
+
+        let asteroidX, asteroidY;
+        let isColliding;
+
+        do {
+            // Randomize asteroid position relative to the planet without overlapping
+            asteroidX = planet.position + (Math.random() * 400 - 200);  // Spread across X axis
+            asteroidY = Math.random() * asteroidOffset - 300;  // Offset asteroids on Y axis for better vertical spread
+
+            // Check if the asteroid is overlapping with the planet
+            const distance = Math.sqrt(Math.pow(asteroidX - planet.position, 2));
+            isColliding = distance < planet.radius + 50;  // Ensure asteroids are outside the planet's radius plus a buffer
+
+        } while (isColliding);  // Retry until no collision
+
+        asteroidMesh.position.set(asteroidX, asteroidY, Math.random() * 600 - 300);  // Adjust Z for some depth
+        scene.add(asteroidMesh);
+    });
+}
+
+    function animate() {
+      requestAnimationFrame(animate);
+      renderer.render(scene, camera);
+    }
+
+    // Initialize the scene
+    init();
+  </script>
+</body>
+</html>
